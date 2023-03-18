@@ -119,6 +119,7 @@ requireNamespace("bit64")
 tar_load(users)
 tar_load(data_parsed_ERT)
 tar_load(data_parsed_PlotR)
+tar_load(data_parsed_TMT)
 tar_load(questions)
 tar_load(question_items)
 ```
@@ -168,4 +169,13 @@ movie_reasoning <- users |>
     .keep = "unused"
   )
 writexl::write_xlsx(movie_reasoning, "behav/movie_reasoning.xlsx")
+```
+
+```{r}
+# targets::tar_invalidate(data_TMT)
+# targets::tar_invalidate(users)
+data_parsed_TMT |>
+  select(user_id, game_time, raw_parsed) |> 
+  unnest(raw_parsed) |> 
+  writexl::write_xlsx("behav/temporal_order.xlsx")
 ```
