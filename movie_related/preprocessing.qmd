@@ -1,0 +1,91 @@
+---
+title: "Pre-processing raw data"
+author: Liang Zhang
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(rvest)
+requireNamespace("bit64")
+tar_load(users)
+```
+
+```{r}
+#| label: move-recollection
+
+tar_load(data_parsed_ERT)
+movie_recollection <- users |>
+  inner_join(data_parsed_ERT, by = "user_id") |>
+  select(
+    user_id, user_name, game_id, game_name, game_time, game_duration, 
+    raw_parsed
+  ) |>
+  mutate(game_duration = game_duration / 60000) |>
+  unnest(raw_parsed)
+writexl::write_xlsx(movie_recollection, "behav/movie_recollection.xlsx")
+```
+
+```{r}
+#| label: questionnaire
+
+# question info
+tar_load(questions)
+tar_load(question_items)
+question_names <- questions |>
+  select(Id, Name) |>
+  deframe()
+question_items_names <- question_items |>
+  select(Id, ItemTitle) |>
+  deframe()
+
+# reasoning on movie
+tar_load(data_parsed_PlotR)
+movie_reasoning <- users |>
+  inner_join(data_parsed_PlotR, by = "user_id") |>
+  filter(map_lgl(raw_parsed, ~ is.character(.$score))) |> 
+  unnest(raw_parsed) |>
+  select(
+    user_id, user_name, game_id, game_name, game_time, game_duration,
+    itemid, rt, resp, cresp, acc
+  ) |>
+  mutate(game_duration = game_duration / 60000) |>
+  mutate(
+    question_name = question_names[as.character(itemid)] |>
+      map_chr(
+        ~ read_html(.) |>
+          html_text2()
+      ),
+    .after = itemid,
+    .keep = "unused"
+  ) |>
+  mutate(
+    cresp = map_chr(
+      cresp,
+      ~ {
+        cresps <- str_split_1(., ",")
+        cresps <- cresps[cresps != ""]
+        str_c(question_items_names[cresps], collapse = ",")
+      }
+    ),
+    resp = map_chr(
+      resp,
+      ~ question_items_names[str_split_1(., ",")] |> 
+        str_c(collapse = ",")
+    ),
+    .keep = "unused"
+  )
+writexl::write_xlsx(movie_reasoning, "behav/movie_reasoning.xlsx")
+```
+
+```{r}
+#| label: temp-order-judge
+
+tar_load(data_parsed_TMT)
+data_parsed_TMT |>
+  select(user_id, game_time, raw_parsed) |> 
+  unnest(raw_parsed) |> 
+  writexl::write_xlsx("behav/temporal_order.xlsx")
+```
