@@ -32,13 +32,6 @@ writexl::write_xlsx(movie_recollection, "behav/movie_recollection.xlsx")
 ```{r}
 #| label: questionnaire
 
-# question info
-question_names <- tar_read(questions) |>
-  select(Id, Name)
-question_items_names <- tar_read(question_items) |>
-  select(Id, ItemTitle) |> 
-  filter(Id != 0)
-
 # include all the questionnaires
 questionnaires <- bind_rows(
   tar_read(data_parsed_PlotR) |>
@@ -54,7 +47,23 @@ questionnaires <- bind_rows(
   mutate(
     item_id_typed = bit64::as.integer64(itemid),
     resp_typed = bit64::as.integer64(resp)
-  ) |> 
+  )
+question_names <- tar_read(questions) |>
+  select(Id, Name) |> 
+  semi_join(questionnaires, by = join_by(Id == item_id_typed)) |> 
+  mutate(
+    # this operation is costly, do it before merging
+    question_name = map_chr(
+      Name,
+      ~ read_html(.) |> 
+        html_text2()
+    ),
+    .keep = "unused"
+  )
+question_items_names <- tar_read(question_items) |>
+  select(Id, ItemTitle) |> 
+  filter(Id != 0)
+questionnaires_matched_items <- questionnaires |> 
   left_join(
     question_names, 
     by = join_by(item_id_typed == Id)
@@ -65,7 +74,6 @@ questionnaires <- bind_rows(
   ) |> 
   mutate(
     game_duration = game_duration / 60000,
-    question_name = str_extract(Name, "(?<=<p>).+(?=</p>)"),
     resp_text = coalesce(ItemTitle, resp)
   ) |> 
   summarise(
@@ -78,7 +86,7 @@ questionnaires <- bind_rows(
     user_name, user_sex, user_dob, game_time, game_duration,
     game_name, question_name, resp_text, acc
   )
-writexl::write_xlsx(questionnaires, "behav/questionnaires.xlsx")
+writexl::write_xlsx(questionnaires_matched_items, "behav/questionnaires.xlsx")
 ```
 
 ```{r}
