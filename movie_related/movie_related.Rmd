@@ -103,5 +103,6 @@ list(
 ```
 
 ```{r run-pipeline, include=FALSE}
+# tar_invalidate(c(starts_with("data"), users))
 tar_make_future(workers = 8)
 ```
